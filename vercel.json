@@ -1,12 +1,7 @@
 {
     "version": 2,
     "framework": "vite",
-    "builds": [
-      {
-        "src": "package.json",
-        "use": "@vercel/nitro"
-      }
-    ],
+    "regions": ["iad1"],
     "routes": [
       {
         "src": "/(.*)",
