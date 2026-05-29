@@ -1,7 +1,6 @@
 {
     "version": 2,
-    "framework": "vite",
-    "regions": ["iad1"],
+    "cleanUrls": true,
     "routes": [
       {
         "src": "/(.*)",
