@@ -12,4 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Required for Vercel (and other self-hosted deploys). Without this, `vite build` only
+  // emits dist/client + dist/server and Vercel serves static files → 404 on /dashboard, etc.
+  nitro: {
+    preset: "vercel",
+  },
 });
