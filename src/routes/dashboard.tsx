@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 import { TrendingUp, ListChecks, Trophy, AlertTriangle, Flame } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -24,10 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { calculateScoreTrend } from "@/lib/score-prediction";
+import { fetchPredictedScore, calculateSectionScores, calculateSectionScoreTrend } from "@/lib/score-prediction";
 import { fetchMistakes } from "@/lib/mistakes";
 import { fetchStudyStreak } from "@/lib/study-sessions";
-import { fetchPredictedScore } from "@/lib/score-prediction";
+
 import { generateFeedback, getWeakestArea, getImprovementRate } from "@/lib/feedback";
 
 export const Route = createFileRoute("/dashboard")({
@@ -116,7 +117,8 @@ function Dashboard() {
   }));
   const recent = mistakes.slice(0, 6);
   const feedbackTips = generateFeedback(mistakes);
-  const scoreTrend = calculateScoreTrend(mistakes);
+  const scoreTrend = calculateSectionScoreTrend(mistakes);
+  const sectionScores = calculateSectionScores(mistakes);
   const weakest = getWeakestArea(mistakes);
   const improvement = getImprovementRate(mistakes);
 
@@ -161,26 +163,12 @@ function Dashboard() {
           <StatCard
             icon={TrendingUp}
             label="Estimated SAT"
-            value={
-              isLoading || scoreLoading
-                ? "—"
-                : scoreError
-                  ? "—"
-                  : String(predictedScore?.score ?? 1200)
-            }
+            value={isLoading ? "—" : sectionScores.total.toString()}
             hint={
-  scoreError
-    ? "Could not load prediction"
-    : mistakes.length === 0
-      ? "Log mistakes to refine"
-      : scoreDelta == null
-        ? `${improvement.label} · based on your log`
-        : scoreDelta === 0
-          ? `${improvement.label} · unchanged`
-          : scoreDelta > 0
-            ? `+${scoreDelta} pts · ${improvement.label}`
-            : `${scoreDelta} pts · ${improvement.label}`
-}
+              isLoading
+                ? "Calculating..."
+                : `M: ${sectionScores.math} · E/RW: ${sectionScores.ebrw} · ${improvement.label}`
+            }
             tone="success"
           />
           <StatCard
@@ -201,7 +189,7 @@ function Dashboard() {
               </div>
               <Badge variant="secondary" className="bg-success/15 text-success">
                   {scoreTrend.length >= 2
-                    ? `${scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score > 0 ? "+" : ""}${scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score} pts`
+                    ? `${scoreTrend[scoreTrend.length - 1].total - scoreTrend[0].total > 0 ? "+" : ""}${scoreTrend[scoreTrend.length - 1].total - scoreTrend[0].total} pts`
                       : "—"}
                 </Badge>
             </div>
@@ -230,11 +218,21 @@ function Dashboard() {
                   />
                   <Line
                     type="monotone"
-                    dataKey="score"
-                    stroke="url(#lg)"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "var(--color-primary)" }}
+                    dataKey="math"
+                    name="Math"
+                    stroke="var(--color-chart-1)"
+                    strokeWidth={2.5}
+                    dot={false}
                   />
+                  <Line
+                    type="monotone"
+                    dataKey="ebrw"
+                    name="EBRW"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2.5}
+                    dot={false}
+                  />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
