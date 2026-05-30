@@ -23,7 +23,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { fetchMistakes } from "@/lib/mistakes";
-import { calculateScoreTrend } from "@/lib/score-prediction";
+import { calculateSectionScoreTrend } from "@/lib/score-prediction";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import {
   buildSkillRadar,
@@ -75,7 +75,7 @@ function Analytics() {
     enabled: authReady,
   });
 
-  const scoreTrend = calculateScoreTrend(mistakes);
+  const scoreTrend = calculateSectionScoreTrend(mistakes);
   const reasonData = buildReasonData(mistakes);
   const radarData = buildSkillRadar(mistakes);
   const heatmapData = buildHeatmap(mistakes);
@@ -140,11 +140,21 @@ function Analytics() {
                   />
                   <Area
                     type="monotone"
-                    dataKey="score"
-                    stroke="var(--color-primary)"
+                    dataKey="math"
+                    name="Math"
+                    stroke="var(--color-chart-1)"
                     strokeWidth={2.5}
-                    fill="url(#area)"
+                    fill="none"
                   />
+                  <Area
+                    type="monotone"
+                    dataKey="ebrw"
+                    name="EBRW"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2.5}
+                    fill="none"
+                  />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
