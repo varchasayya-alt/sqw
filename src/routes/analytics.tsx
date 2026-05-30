@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   AreaChart,
   Area,
@@ -21,29 +22,20 @@ import { Sparkles, TrendingUp, Target } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { scoreTrend, heatmap } from "@/lib/mock-data";
+import { fetchMistakes } from "@/lib/mistakes";
+import { calculateSectionScoreTrend } from "@/lib/score-prediction";
+import { useRequireAuth } from "@/hooks/use-require-auth";
+import {
+  buildSkillRadar,
+  buildHeatmap,
+  buildReasonData,
+  buildRecommendations,
+} from "@/lib/feedback";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({ meta: [{ title: "Analytics — ScorePilot" }] }),
   component: Analytics,
 });
-
-const reasonData = [
-  { name: "Careless", value: 28 },
-  { name: "Concept gap", value: 34 },
-  { name: "Time pressure", value: 18 },
-  { name: "Misread", value: 12 },
-  { name: "Wrong evidence", value: 8 },
-];
-
-const radarData = [
-  { skill: "Algebra", you: 62, target: 90 },
-  { skill: "Geometry", you: 70, target: 90 },
-  { skill: "Data", you: 78, target: 90 },
-  { skill: "Reading", you: 82, target: 90 },
-  { skill: "Vocab", you: 74, target: 90 },
-  { skill: "Grammar", you: 88, target: 90 },
-];
 
 const COLORS = [
   "var(--color-chart-1)",
@@ -53,30 +45,55 @@ const COLORS = [
   "var(--color-chart-5)",
 ];
 
-function Heatmap() {
+function Heatmap({ data }: { data: { day: number; intensity: number; date: string }[] }) {
+  const shades = [
+    "bg-muted",
+    "bg-primary/20",
+    "bg-primary/40",
+    "bg-primary/70",
+    "bg-primary",
+  ];
   return (
     <div className="grid grid-cols-7 gap-1.5">
-      {heatmap.map((d) => {
-        const shades = [
-          "bg-muted",
-          "bg-primary/20",
-          "bg-primary/40",
-          "bg-primary/70",
-          "bg-primary",
-        ];
-        return (
-          <div
-            key={d.day}
-            className={`aspect-square rounded-md ${shades[d.intensity]} transition-transform hover:scale-110`}
-            title={`Day ${d.day + 1}: ${d.intensity} sessions`}
-          />
-        );
-      })}
+      {data.map((d) => (
+        <div
+          key={d.day}
+          className={`aspect-square rounded-md ${shades[d.intensity]} transition-transform hover:scale-110`}
+          title={`${d.date}: ${d.intensity === 0 ? "No mistakes logged" : `${d.intensity} mistake${d.intensity > 1 ? "s" : ""} logged`}`}
+        />
+      ))}
     </div>
   );
 }
 
 function Analytics() {
+  const authReady = useRequireAuth();
+
+  const { data: mistakes = [], isLoading } = useQuery({
+    queryKey: ["mistakes"],
+    queryFn: fetchMistakes,
+    enabled: authReady,
+  });
+
+  const scoreTrend = calculateSectionScoreTrend(mistakes);
+  const reasonData = buildReasonData(mistakes);
+  const radarData = buildSkillRadar(mistakes);
+  const heatmapData = buildHeatmap(mistakes);
+  const recommendations = buildRecommendations(mistakes);
+
+  const scoreDelta =
+    scoreTrend.length >= 2
+      ? scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score
+      : null;
+
+  if (!authReady || isLoading) {
+    return (
+      <DashboardLayout title="Analytics">
+        <p className="text-sm text-muted-foreground">Loading analytics...</p>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="Analytics">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -87,15 +104,21 @@ function Analytics() {
               Deep insights into how you're improving.
             </p>
           </div>
-          <Badge variant="secondary" className="bg-success/15 text-success">
-            <TrendingUp className="mr-1 h-3 w-3" /> Trending up
-          </Badge>
+          {scoreDelta !== null && (
+            <Badge
+              variant="secondary"
+              className={scoreDelta >= 0 ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive"}
+            >
+              <TrendingUp className="mr-1 h-3 w-3" />
+              {scoreDelta >= 0 ? `+${scoreDelta}` : scoreDelta} pts this period
+            </Badge>
+          )}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="p-5 lg:col-span-2">
             <h3 className="mb-1 font-semibold">Predicted score over time</h3>
-            <p className="mb-4 text-xs text-muted-foreground">5-week rolling trend</p>
+            <p className="mb-4 text-xs text-muted-foreground">5-week rolling trend based on your mistakes</p>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={scoreTrend}>
@@ -107,11 +130,7 @@ function Analytics() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="date" stroke="var(--color-muted-foreground)" fontSize={12} />
-                  <YAxis
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={12}
-                    domain={[1100, 1500]}
-                  />
+                  <YAxis stroke="var(--color-muted-foreground)" fontSize={12} domain={[1100, 1600]} />
                   <Tooltip
                     contentStyle={{
                       background: "var(--color-popover)",
@@ -121,11 +140,21 @@ function Analytics() {
                   />
                   <Area
                     type="monotone"
-                    dataKey="score"
-                    stroke="var(--color-primary)"
+                    dataKey="math"
+                    name="Math"
+                    stroke="var(--color-chart-1)"
                     strokeWidth={2.5}
-                    fill="url(#area)"
+                    fill="none"
                   />
+                  <Area
+                    type="monotone"
+                    dataKey="ebrw"
+                    name="EBRW"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2.5}
+                    fill="none"
+                  />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -135,30 +164,36 @@ function Analytics() {
             <h3 className="mb-1 font-semibold">Mistake reasons</h3>
             <p className="mb-4 text-xs text-muted-foreground">What's costing you points</p>
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={reasonData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={50}
-                    outerRadius={85}
-                    paddingAngle={3}
-                  >
-                    {reasonData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--color-popover)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: 8,
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
+              {reasonData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  No mistakes logged yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={reasonData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={85}
+                      paddingAngle={3}
+                    >
+                      {reasonData.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--color-popover)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 8,
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </Card>
         </div>
@@ -166,17 +201,15 @@ function Analytics() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="p-5">
             <h3 className="mb-1 font-semibold">Skill radar</h3>
-            <p className="mb-4 text-xs text-muted-foreground">You vs. your target</p>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Your proficiency vs. target — based on mistake patterns
+            </p>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="var(--color-border)" />
-                  <PolarAngleAxis
-                    dataKey="skill"
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={12}
-                  />
-                  <PolarRadiusAxis stroke="var(--color-muted-foreground)" fontSize={10} />
+                  <PolarAngleAxis dataKey="skill" stroke="var(--color-muted-foreground)" fontSize={12} />
+                  <PolarRadiusAxis stroke="var(--color-muted-foreground)" fontSize={10} domain={[0, 100]} />
                   <Radar
                     name="You"
                     dataKey="you"
@@ -199,8 +232,10 @@ function Analytics() {
 
           <Card className="p-5">
             <h3 className="mb-1 font-semibold">Study heatmap</h3>
-            <p className="mb-4 text-xs text-muted-foreground">Last 5 weeks of activity</p>
-            <Heatmap />
+            <p className="mb-4 text-xs text-muted-foreground">
+              Last 5 weeks — darker = more mistakes logged that day
+            </p>
+            <Heatmap data={heatmapData} />
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
               <span>Less</span>
               <div className="h-3 w-3 rounded-sm bg-muted" />
@@ -220,33 +255,28 @@ function Analytics() {
             </div>
             <div>
               <h3 className="font-semibold">Personalized recommendations</h3>
-              <p className="text-xs text-muted-foreground">Based on your last 30 days of data</p>
+              <p className="text-xs text-muted-foreground">
+                Based on your actual mistake patterns
+              </p>
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              {
-                title: "Drill Algebra fundamentals",
-                desc: "Concept gaps cost you ~40 points. 15 min/day for 2 weeks closes most.",
-              },
-              {
-                title: "Practice under time",
-                desc: "Time-pressure misses jumped this week. Try 25-min timed sets.",
-              },
-              {
-                title: "Active reading routine",
-                desc: "Annotate evidence before checking answers to fix inference errors.",
-              },
-            ].map((r) => (
-              <div key={r.title} className="rounded-lg border border-border bg-card/60 p-4">
-                <div className="mb-1 flex items-center gap-2 text-sm font-medium">
-                  <Target className="h-4 w-4 text-primary" />
-                  {r.title}
+          {recommendations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Log at least 3 mistakes to get personalized recommendations.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3">
+              {recommendations.map((r) => (
+                <div key={r.title} className="rounded-lg border border-border bg-card/60 p-4">
+                  <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+                    <Target className="h-4 w-4 text-primary" />
+                    {r.title}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{r.desc}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">{r.desc}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </DashboardLayout>
