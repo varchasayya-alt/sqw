@@ -28,6 +28,7 @@ import { scoreTrend } from "@/lib/mock-data";
 import { fetchMistakes } from "@/lib/mistakes";
 import { fetchStudyStreak } from "@/lib/study-sessions";
 import { fetchPredictedScore } from "@/lib/score-prediction";
+import { generateFeedback, getWeakestArea } from "@/lib/feedback";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — ScorePilot" }] }),
@@ -114,6 +115,8 @@ function Dashboard() {
     mistakes: mistakes.filter((m) => m.section === s).length,
   }));
   const recent = mistakes.slice(0, 6);
+  const feedbackTips = generateFeedback(mistakes);
+  const weakest = getWeakestArea(mistakes);
 
   if (!authReady) {
     return (
@@ -179,11 +182,11 @@ function Dashboard() {
             tone="success"
           />
           <StatCard
-            icon={AlertTriangle}
-            label="Weakest"
-            value="Math · Algebra"
-            hint="58% accuracy"
-            tone="destructive"
+          icon={AlertTriangle}
+          label="Weakest"
+          value={isLoading ? "—" : weakest.label}
+          hint={isLoading ? "Loading..." : weakest.hint}
+          tone="destructive"
           />
         </div>
 
@@ -317,6 +320,24 @@ function Dashboard() {
             )}
           </div>
         </Card>
+        {feedbackTips.length > 0 && (
+  <Card className="p-5">
+    <div className="mb-4">
+      <h3 className="font-semibold">📋 Personalized tips</h3>
+      <p className="text-xs text-muted-foreground">Based on your mistake patterns</p>
+    </div>
+    <div className="space-y-2">
+      {feedbackTips.map((tip, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-border bg-accent/30 px-4 py-3 text-sm"
+        >
+          {tip}
+        </div>
+      ))}
+    </div>
+  </Card>
+)}
       </div>
     </DashboardLayout>
   );
