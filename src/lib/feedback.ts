@@ -75,4 +75,4 @@ export function getWeakestArea(mistakes: Mistake[]): { label: string; hint: stri
   ).length;
   const pct = Math.round((total / mistakes.length) * 100);
   return { label: top[0], hint: `${pct}% of your mistakes` };
-}
+} 
