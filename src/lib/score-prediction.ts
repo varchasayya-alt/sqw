@@ -121,3 +121,67 @@ export function calculateScoreTrend(mistakes: Mistake[]): { date: string; score:
 
   return weeks;
 }
+// ── Section-split scoring ──────────────────────────────────────────────────
+
+const MATH_BASE_SECTION = 760;
+const EBRW_BASE_SECTION = 760;
+
+const SECTION_PENALTY: Record<Mistake["difficulty"], number> = {
+  Easy: 8,
+  Medium: 16,
+  Hard: 28,
+};
+
+function recencyWeight(daysAgo: number): number {
+  if (daysAgo <= 7)  return 1.0;   // full penalty — very recent
+  if (daysAgo <= 14) return 0.8;   // still fresh
+  if (daysAgo <= 28) return 0.5;   // fading — you've likely reviewed it
+  return 0.2;                       // old — minimal impact
+}
+
+export type SectionScores = { math: number; ebrw: number; total: number };
+
+export function calculateSectionScores(
+  mistakes: Mistake[],
+  asOfDate?: Date
+): SectionScores {
+  const now = asOfDate ?? new Date();
+
+  if (mistakes.length === 0) {
+    return { math: 650, ebrw: 650, total: 1300 };
+  }
+
+  let math = MATH_BASE_SECTION;
+  let ebrw = EBRW_BASE_SECTION;
+
+  for (const m of mistakes) {
+    const daysAgo = m.date
+      ? Math.max(0, Math.floor((now.getTime() - new Date(m.date).getTime()) / 86_400_000))
+      : 0;
+    const penalty = SECTION_PENALTY[m.difficulty] * recencyWeight(daysAgo);
+
+    if (m.section === "Math") {
+      math -= penalty;
+    } else {
+      // Reading + Writing both feed into EBRW
+      ebrw -= penalty;
+    }
+  }
+
+  const mathFinal  = Math.round(Math.min(800, Math.max(200, math)));
+  const ebrwFinal  = Math.round(Math.min(800, Math.max(200, ebrw)));
+  return { math: mathFinal, ebrw: ebrwFinal, total: mathFinal + ebrwFinal };
+}
+
+export function calculateSectionScoreTrend(
+  mistakes: Mistake[]
+): { date: string; math: number; ebrw: number; total: number }[] {
+  const now = new Date();
+  return Array.from({ length: 5 }, (_, i) => {
+    const weekEnd = new Date(now);
+    weekEnd.setDate(now.getDate() - (4 - i) * 7);
+    const label = weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const slice = mistakes.filter((m) => m.date && new Date(m.date) <= weekEnd);
+    return { date: label, ...calculateSectionScores(slice, weekEnd) };
+  });
+}
