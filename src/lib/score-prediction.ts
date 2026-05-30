@@ -106,3 +106,18 @@ export async function fetchPredictedScore(mistakes: Mistake[]): Promise<Predicte
 
   return { score, previousScore };
 }
+export function calculateScoreTrend(mistakes: Mistake[]): { date: string; score: number }[] {
+  const weeks: { date: string; score: number }[] = [];
+  const now = new Date();
+
+  for (let i = 4; i >= 0; i--) {
+    const weekEnd = new Date(now);
+    weekEnd.setDate(now.getDate() - i * 7);
+    const label = weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const mistakesUpToWeek = mistakes.filter((m) => new Date(m.date) <= weekEnd);
+    const score = mistakesUpToWeek.length === 0 ? DEFAULT_SCORE_NO_DATA : calculatePredictedScore(mistakesUpToWeek);
+    weeks.push({ date: label, score });
+  }
+
+  return weeks;
+}
