@@ -28,7 +28,7 @@ import { calculateScoreTrend } from "@/lib/score-prediction";
 import { fetchMistakes } from "@/lib/mistakes";
 import { fetchStudyStreak } from "@/lib/study-sessions";
 import { fetchPredictedScore } from "@/lib/score-prediction";
-import { generateFeedback, getWeakestArea } from "@/lib/feedback";
+import { generateFeedback, getWeakestArea, getImprovementRate } from "@/lib/feedback";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — ScorePilot" }] }),
@@ -118,6 +118,7 @@ function Dashboard() {
   const feedbackTips = generateFeedback(mistakes);
   const scoreTrend = calculateScoreTrend(mistakes);
   const weakest = getWeakestArea(mistakes);
+  const improvement = getImprovementRate(mistakes);
 
   if (!authReady) {
     return (
@@ -168,18 +169,18 @@ function Dashboard() {
                   : String(predictedScore?.score ?? 1200)
             }
             hint={
-              scoreError
-                ? "Could not load prediction"
-                : mistakes.length === 0
-                  ? "Log mistakes to refine"
-                  : scoreDelta == null
-                    ? "Based on your mistake log"
-                    : scoreDelta === 0
-                      ? "Unchanged since last update"
-                      : scoreDelta > 0
-                        ? `+${scoreDelta} vs last prediction`
-                        : `${scoreDelta} vs last prediction`
-            }
+  scoreError
+    ? "Could not load prediction"
+    : mistakes.length === 0
+      ? "Log mistakes to refine"
+      : scoreDelta == null
+        ? `${improvement.label} · based on your log`
+        : scoreDelta === 0
+          ? `${improvement.label} · unchanged`
+          : scoreDelta > 0
+            ? `+${scoreDelta} pts · ${improvement.label}`
+            : `${scoreDelta} pts · ${improvement.label}`
+}
             tone="success"
           />
           <StatCard
