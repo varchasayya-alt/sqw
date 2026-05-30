@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { scoreTrend } from "@/lib/mock-data";
+import { calculateScoreTrend } from "@/lib/score-prediction";
 import { fetchMistakes } from "@/lib/mistakes";
 import { fetchStudyStreak } from "@/lib/study-sessions";
 import { fetchPredictedScore } from "@/lib/score-prediction";
@@ -116,6 +116,7 @@ function Dashboard() {
   }));
   const recent = mistakes.slice(0, 6);
   const feedbackTips = generateFeedback(mistakes);
+  const scoreTrend = calculateScoreTrend(mistakes);
   const weakest = getWeakestArea(mistakes);
 
   if (!authReady) {
@@ -198,8 +199,10 @@ function Dashboard() {
                 <p className="text-xs text-muted-foreground">Predicted SAT over the last 5 weeks</p>
               </div>
               <Badge variant="secondary" className="bg-success/15 text-success">
-                +160 pts
-              </Badge>
+                  {scoreTrend.length >= 2
+                    ? `${scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score > 0 ? "+" : ""}${scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score} pts`
+                      : "—"}
+                </Badge>
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
