@@ -75,5 +75,5 @@ try {
     focusAreas: []
   });
 }
-  res.json({ report });
+  
 }
