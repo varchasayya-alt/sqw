@@ -14,7 +14,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   for (const m of mistakes) {
     if (m.questionType) typeCounts[m.questionType] = (typeCounts[m.questionType] || 0) + 1;
   }
-  const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0][0];
+  const topType = Object.entries(typeCounts)
+  .sort((a, b) => b[1] - a[1])[0][0];
+
+const recentMistakes = mistakes
+  .slice(-10)
+  .map(
+    (m: any) =>
+      `Type: ${m.questionType}
+Reason: ${m.reason}
+Notes: ${m.notes || "none"}`
+  )
+  .join("\n\n");
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -32,15 +43,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         {
           role: "user",
-          content: `Generate 3 SAT-style practice questions for the topic: "${topType}".
-          
-Return ONLY a JSON array like this:
+          content: `The student frequently misses questions with these patterns:
+
+${recentMistakes}
+
+Generate 3 Digital SAT practice questions.
+
+Requirements:
+- Topic should primarily be "${topType}"
+- Difficulty must be 700-800 SAT level
+- Similar to the student's actual weaknesses
+- Multi-step reasoning required
+- Include realistic SAT distractors
+- Avoid simple plug-and-chug questions
+- Questions should feel like the hardest SAT problems
+
+Return ONLY JSON:
+
 [
   {
-    "question": "question text here",
-    "choices": ["A) ...", "B) ...", "C) ...", "D) ..."],
+    "question": "question text",
+    "choices": [
+      "A) ...",
+      "B) ...",
+      "C) ...",
+      "D) ..."
+    ],
     "answer": "A",
-    "explanation": "brief explanation of why A is correct"
+    "explanation": "why A is correct"
   }
 ]`,
         },

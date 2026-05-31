@@ -117,7 +117,12 @@ function Dashboard() {
     mistakes: mistakes.filter((m) => m.section === s).length,
   }));
   const recent = mistakes.slice(0, 6);
-  const [studyReport, setStudyReport] = useState("");
+  const [studyReport, setStudyReport] = useState<null | {
+  weaknesses: string[];
+  analysis: string;
+  actionItems: string[];
+  focusAreas: string[];
+}>(null);
 const [reportLoading, setReportLoading] = useState(false);
 const [chatOpen, setChatOpen] = useState(false);
 const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
@@ -133,9 +138,14 @@ async function fetchStudyReport() {
       body: JSON.stringify({ mistakes }),
     });
     const data = await res.json();
-    setStudyReport(data.report);
+    setStudyReport(data);
   } catch {
-    setStudyReport("Failed to generate report. Please try again.");
+    setStudyReport({
+  weaknesses: [],
+  analysis: "Failed to generate report.",
+  actionItems: [],
+  focusAreas: []
+});
   } finally {
     setReportLoading(false);
   }
@@ -405,10 +415,46 @@ async function sendChat() {
     <p className="text-sm text-muted-foreground">Log at least 3 mistakes to generate your report.</p>
   )}
   {studyReport && (
-    <div className="rounded-lg border border-border bg-accent/30 p-4 text-sm whitespace-pre-wrap leading-relaxed">
-      {studyReport}
+  <div className="space-y-4 rounded-lg border border-border bg-accent/30 p-4 text-sm">
+    
+    {/* Analysis */}
+    <div>
+      <h4 className="font-semibold mb-1">Analysis</h4>
+      <p className="text-muted-foreground">{studyReport.analysis}</p>
     </div>
-  )}
+
+    {/* Weaknesses */}
+    <div>
+      <h4 className="font-semibold mb-1">Weaknesses</h4>
+      <ul className="list-disc pl-5 text-muted-foreground">
+        {studyReport.weaknesses.map((w, i) => (
+          <li key={i}>{w}</li>
+        ))}
+      </ul>
+    </div>
+
+    {/* Action Items */}
+    <div>
+      <h4 className="font-semibold mb-1">Action Items</h4>
+      <ul className="list-decimal pl-5 text-muted-foreground">
+        {studyReport.actionItems.map((a, i) => (
+          <li key={i}>{a}</li>
+        ))}
+      </ul>
+    </div>
+
+    {/* Focus Areas */}
+    <div>
+      <h4 className="font-semibold mb-1">Focus Areas</h4>
+      <ul className="list-disc pl-5 text-muted-foreground">
+        {studyReport.focusAreas.map((f, i) => (
+          <li key={i}>{f}</li>
+        ))}
+      </ul>
+    </div>
+
+  </div>
+)}
 </Card>
 
 {/* SAT Coach Chat Widget */}
