@@ -23,19 +23,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       model: "gpt-4o-mini",
       max_tokens: 600,
       messages: [
-        {
-          role: "system",
-          content: "You are an expert SAT tutor. Be specific, direct, and encouraging. Format your response with clear sections using emoji headers.",
-        },
-        {
-          role: "user",
-          content: `A student has logged these SAT mistakes:\n${summary}\n\nGenerate a personalized study report with these sections:\n1. 💡 Key Weaknesses (top 2-3 patterns you see)\n2. 📊 What This Tells Us (what these mistakes reveal about their habits or gaps)\n3. 🎯 Top 3 Action Items (specific, actionable steps for this week)\n4. 📈 What To Focus On Next (priority topics to study)\n\nBe specific to their actual mistakes, not generic. Keep it under 250 words.`,
-        },
-      ],
+  {
+    role: "system",
+    content: `You are an expert SAT tutor.
+
+Return ONLY valid JSON.
+
+Schema:
+
+{
+  "weaknesses": ["string"],
+  "analysis": "string",
+  "actionItems": ["string"],
+  "focusAreas": ["string"]
+}
+
+Rules:
+- No markdown
+- No headings
+- No emojis
+- No asterisks
+- No extra text outside JSON
+- Be specific to the student's mistakes
+- Keep weaknesses to 2-4 items
+- Keep actionItems to exactly 3 items`
+  },
+  {
+    role: "user",
+    content: `A student has logged these SAT mistakes:
+
+${summary}
+
+Analyze the mistakes and return a personalized study report using the JSON schema above.`
+  }
+],
     }),
   });
 
   const data = await response.json();
-  const report = data.choices?.[0]?.message?.content ?? "Could not generate report. Please try again.";
+  const raw =
+  data.choices?.[0]?.message?.content ?? "{}";
+
+try {
+  const report = JSON.parse(raw);
+  res.json(report);
+} catch {
+  res.json({
+    weaknesses: [],
+    analysis: "Could not generate report.",
+    actionItems: [],
+    focusAreas: []
+  });
+}
   res.json({ report });
 }
