@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -18,7 +19,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Sparkles, TrendingUp, Target } from "lucide-react";
+import { Sparkles, TrendingUp, Target, BookOpen, ChevronRight, CheckCircle, XCircle } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +81,32 @@ function Analytics() {
   const radarData = buildSkillRadar(mistakes);
   const heatmapData = buildHeatmap(mistakes);
   const recommendations = buildRecommendations(mistakes);
+  const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
+const [practiceTopic, setPracticeTopic] = useState("");
+const [practiceLoading, setPracticeLoading] = useState(false);
+const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+const [showAnswers, setShowAnswers] = useState<Record<number, boolean>>({});
+
+async function fetchPractice() {
+  setPracticeLoading(true);
+  setPracticeQuestions([]);
+  setSelectedAnswers({});
+  setShowAnswers({});
+  try {
+    const res = await fetch("/api/practice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mistakes }),
+    });
+    const data = await res.json();
+    setPracticeQuestions(data.questions || []);
+    setPracticeTopic(data.topic || "");
+  } catch {
+    setPracticeQuestions([]);
+  } finally {
+    setPracticeLoading(false);
+  }
+}
 
   const scoreDelta =
     scoreTrend.length >= 2
@@ -278,6 +305,84 @@ function Analytics() {
             </div>
           )}
         </Card>
+      <Card className="p-6">
+  <div className="mb-4 flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-primary">
+        <BookOpen className="h-5 w-5" />
+      </div>
+      <div>
+        <h3 className="font-semibold">Practice Questions</h3>
+        <p className="text-xs text-muted-foreground">
+          {practiceTopic ? `Focused on: ${practiceTopic}` : "AI-generated for your weakest area"}
+        </p>
+      </div>
+    </div>
+    <button
+      onClick={fetchPractice}
+      disabled={practiceLoading || mistakes.length === 0}
+      className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
+    >
+      {practiceLoading ? "Generating..." : (
+        <>Generate <ChevronRight className="h-4 w-4" /></>
+      )}
+    </button>
+  </div>
+
+  {mistakes.length === 0 && (
+    <p className="text-sm text-muted-foreground">Log some mistakes first so we know what to practice.</p>
+  )}
+
+  {practiceQuestions.length > 0 && (
+    <div className="space-y-6">
+      {practiceQuestions.map((q, i) => (
+        <div key={i} className="rounded-lg border border-border bg-card/60 p-4">
+          <p className="mb-3 text-sm font-medium">Q{i + 1}. {q.question}</p>
+          <div className="space-y-2">
+            {q.choices.map((choice: string, j: number) => {
+              const letter = choice[0];
+              const isSelected = selectedAnswers[i] === letter;
+              const isCorrect = letter === q.answer;
+              const revealed = showAnswers[i];
+              return (
+                <button
+                  key={j}
+                  onClick={() => {
+                    setSelectedAnswers(prev => ({ ...prev, [i]: letter }));
+                    setShowAnswers(prev => ({ ...prev, [i]: true }));
+                  }}
+                  className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                    revealed && isCorrect
+                      ? "border-green-500 bg-green-500/10 text-green-600"
+                      : revealed && isSelected && !isCorrect
+                      ? "border-red-500 bg-red-500/10 text-red-600"
+                      : "border-border hover:bg-accent"
+                  }`}
+                >
+                  {choice}
+                </button>
+              );
+            })}
+          </div>
+          {showAnswers[i] && (
+            <div className="mt-3 flex items-start gap-2 rounded-md bg-accent/50 p-3 text-xs">
+              {selectedAnswers[i] === q.answer
+                ? <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                : <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              }
+              <div>
+                <span className="font-medium">
+                  {selectedAnswers[i] === q.answer ? "Correct! " : `Incorrect. Answer: ${q.answer}. `}
+                </span>
+                {q.explanation}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</Card>
       </div>
     </DashboardLayout>
   );

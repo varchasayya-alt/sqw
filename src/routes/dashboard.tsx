@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -13,7 +14,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { TrendingUp, ListChecks, Trophy, AlertTriangle, Flame } from "lucide-react";
+import { TrendingUp, ListChecks, Trophy, AlertTriangle, Flame, MessageCircle, Sparkles, X, Send, ChevronDown } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -116,6 +117,51 @@ function Dashboard() {
     mistakes: mistakes.filter((m) => m.section === s).length,
   }));
   const recent = mistakes.slice(0, 6);
+  const [studyReport, setStudyReport] = useState("");
+const [reportLoading, setReportLoading] = useState(false);
+const [chatOpen, setChatOpen] = useState(false);
+const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
+const [chatInput, setChatInput] = useState("");
+const [chatLoading, setChatLoading] = useState(false);
+
+async function fetchStudyReport() {
+  setReportLoading(true);
+  try {
+    const res = await fetch("/api/study-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mistakes }),
+    });
+    const data = await res.json();
+    setStudyReport(data.report);
+  } catch {
+    setStudyReport("Failed to generate report. Please try again.");
+  } finally {
+    setReportLoading(false);
+  }
+}
+
+async function sendChat() {
+  if (!chatInput.trim()) return;
+  const userMsg = { role: "user", content: chatInput };
+  const newHistory = [...chatMessages, userMsg];
+  setChatMessages(newHistory);
+  setChatInput("");
+  setChatLoading(true);
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: chatInput, mistakes, history: chatMessages }),
+    });
+    const data = await res.json();
+    setChatMessages([...newHistory, { role: "assistant", content: data.reply }]);
+  } catch {
+    setChatMessages([...newHistory, { role: "assistant", content: "Something went wrong. Try again!" }]);
+  } finally {
+    setChatLoading(false);
+  }
+}
   const feedbackTips = generateFeedback(mistakes);
   const scoreTrend = calculateSectionScoreTrend(mistakes);
   const sectionScores = calculateSectionScores(mistakes);
@@ -340,6 +386,93 @@ function Dashboard() {
     </div>
   </Card>
 )}
+      {/* AI Study Report */}
+<Card className="p-5">
+  <div className="mb-4 flex items-center justify-between">
+    <div>
+      <h3 className="font-semibold">🧠 AI Study Report</h3>
+      <p className="text-xs text-muted-foreground">Generated from your mistake patterns</p>
+    </div>
+    <button
+      onClick={fetchStudyReport}
+      disabled={reportLoading || mistakes.length < 3}
+      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
+    >
+      {reportLoading ? "Generating..." : "Generate Report"}
+    </button>
+  </div>
+  {mistakes.length < 3 && !studyReport && (
+    <p className="text-sm text-muted-foreground">Log at least 3 mistakes to generate your report.</p>
+  )}
+  {studyReport && (
+    <div className="rounded-lg border border-border bg-accent/30 p-4 text-sm whitespace-pre-wrap leading-relaxed">
+      {studyReport}
+    </div>
+  )}
+</Card>
+
+{/* SAT Coach Chat Widget */}
+<div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+  {chatOpen && (
+    <Card className="w-80 flex flex-col shadow-2xl overflow-hidden">
+      <div className="flex items-center justify-between bg-primary px-4 py-3">
+        <div className="flex items-center gap-2 text-primary-foreground">
+          <Sparkles className="h-4 w-4" />
+          <span className="text-sm font-semibold">SAT Coach</span>
+        </div>
+        <button onClick={() => setChatOpen(false)}>
+          <X className="h-4 w-4 text-primary-foreground" />
+        </button>
+      </div>
+      <div className="flex flex-col gap-2 overflow-y-auto p-3 h-64">
+        {chatMessages.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Ask me anything about your SAT prep!
+          </p>
+        )}
+        {chatMessages.map((msg, i) => (
+          <div
+            key={i}
+            className={`rounded-lg px-3 py-2 text-xs max-w-[90%] ${
+              msg.role === "user"
+                ? "self-end bg-primary text-primary-foreground"
+                : "self-start bg-accent text-foreground"
+            }`}
+          >
+            {msg.content}
+          </div>
+        ))}
+        {chatLoading && (
+          <div className="self-start rounded-lg bg-accent px-3 py-2 text-xs text-muted-foreground">
+            Thinking...
+          </div>
+        )}
+      </div>
+      <div className="flex gap-2 border-t border-border p-3">
+        <input
+          className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+          placeholder="Ask a question..."
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendChat()}
+        />
+        <button
+          onClick={sendChat}
+          disabled={chatLoading}
+          className="rounded-md bg-primary p-1.5 text-primary-foreground disabled:opacity-50"
+        >
+          <Send className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </Card>
+  )}
+  <button
+    onClick={() => setChatOpen(!chatOpen)}
+    className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition-opacity"
+  >
+    {chatOpen ? <ChevronDown className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
+  </button>
+</div>
       </div>
     </DashboardLayout>
   );
