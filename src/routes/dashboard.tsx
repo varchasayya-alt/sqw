@@ -485,7 +485,16 @@ async function sendChat() {
                 : "self-start bg-accent text-foreground"
             }`}
           >
-            {msg.content}
+            <div className="space-y-2 text-xs leading-relaxed">
+  {msg.content
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line, i) => (
+      <div key={i} className="rounded-md px-2 py-1 bg-opacity-0">
+        {line}
+      </div>
+    ))}
+</div>
           </div>
         ))}
         {chatLoading && (
